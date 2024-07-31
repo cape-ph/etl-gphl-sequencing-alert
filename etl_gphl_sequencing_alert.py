@@ -4,14 +4,11 @@ import io
 import sys
 
 import boto3 as boto3
-import pandas as pd
 from awsglue.context import GlueContext
 from awsglue.utils import getResolvedOptions
-from docx import Document
-from pyspark.sql import SparkSession
-
-from tabula import read_pdf
 from pypdf import PdfReader
+from pyspark.sql import SparkSession
+from tabula.io import read_pdf
 
 # for our purposes here, the spark and glue context are only (currently) needed
 # to get the logger.
@@ -44,12 +41,12 @@ clean_bucket_name = parameters["CLEAN_BUCKET_NAME"]
 # NOTE: for now we'll take the alert object key and change out the file
 #       extension for the clean data (leaving all namespacing and such). this
 #       will probably need to change
-clean_obj_key = alert_obj_key.replace(".docx", ".csv")
+clean_obj_key = alert_obj_key.replace(".pdf", ".csv")
 
 # NOTE: May need some creds here
 s3_client = boto3.client("s3")
 
-# try to get the docx object from S3 and handle any error that would keep us
+# try to get the pdf object from S3 and handle any error that would keep us
 # from continuing.
 response = s3_client.get_object(Bucket=raw_bucket_name, Key=alert_obj_key)
 
@@ -78,21 +75,22 @@ f = io.BytesIO(response.get("Body").read())
 
 # get the report date from the 4th line of the pdf
 reader = PdfReader(f)
-page = reader.pages[0] 
-date_reported = page.extract_text().split('\n')[3]
+page = reader.pages[0]
+date_reported = page.extract_text().split("\n")[3]
 
 # get two tables from the pdf
-tables = read_pdf(f,multiple_tables=True,pages=2)
+tables = read_pdf(f, multiple_tables=True, pages=2)
+assert isinstance(tables, list)
 mlst_st = tables[0]
-genes = tables[1].set_index('Unnamed: 0').T
+genes = tables[1].set_index("Unnamed: 0").T
 
 # filter the columns we need and join the tables together
-interim = mlst_st[['Accession_ID','WGS_ID','MLST_ST']]
+interim = mlst_st[["Accession_ID", "WGS_ID", "MLST_ST"]]
 genes_interim = genes.filter(regex="(NDM|KPC|IMP|OXA|VIM|CMY)", axis=1)
 interim = interim.join(genes_interim, on="WGS_ID")
-interim['Date Reported'] = date_reported
+interim["Date Reported"] = date_reported
 
-# write out the transofrmed data
+# write out the transformed data
 with io.StringIO() as csv_buff:
     interim.to_csv(csv_buff, index=False)
 
