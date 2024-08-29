@@ -84,7 +84,7 @@ except ValueError as err:
     err_message = (
             f"ERROR - Could not properly read sequencing report date. "
             f"ETL will continue."
-            + err
+            f"{err}"
         )
 
     logger.error(err_message)
@@ -100,7 +100,7 @@ except (IndexError, KeyError) as err:
     err_message = (
             f"ERROR - Could not properly read sequencing PDF tables. "
             f"ETL Cannot continue."
-            + err
+            f"{err}"
         )
 
     logger.error(err_message)
