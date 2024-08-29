@@ -80,7 +80,7 @@ try:
     page = reader.pages[0]
     date_reported = page.extract_text().split("\n")[3].strip()
     datetime.strptime(date_reported,'%m/%d/%Y')
-except:
+except ValueError:
     err = (
             f"ERROR - Could not properly read sequencing report date. "
             f"ETL will continue."
@@ -94,16 +94,10 @@ try:
     # get two tables from the pdf
     tables = read_pdf(f, multiple_tables=True, pages=2)
     mlst_st = tables[0]
-    genes = tables[1].set_index("Unnamed: 0").T
-
-    # filter the columns we need and join the tables together
-    interim = mlst_st[["Accession_ID", "WGS_ID", "MLST_ST"]]
-    genes_interim = genes.filter(regex="(NDM|KPC|IMP|OXA|VIM|CMY)", axis=1)
-    interim = interim.join(genes_interim, on="WGS_ID")
-    interim["Date Reported"] = date_reported
-except:
+    genes = tables[1]
+except IndexError:
     err = (
-            f"ERROR - Could not properly read and/or format sequencing PDF tables. "
+            f"ERROR - Could not properly read sequencing PDF tables. "
             f"ETL Cannot continue."
         )
 
@@ -113,6 +107,12 @@ except:
     #       want this going somewhere very visible (e.g. SNS topic or a
     #       perpetual log as someone will need to be made aware)
     raise Exception(err)
+
+# filter the columns we need and join the tables together
+interim = mlst_st[["Accession_ID", "WGS_ID", "MLST_ST"]]
+genes_interim = genes.set_index("Unnamed: 0").T.filter(regex="(NDM|KPC|IMP|OXA|VIM|CMY)", axis=1)
+interim = interim.join(genes_interim, on="WGS_ID")
+interim["Date Reported"] = date_reported
 
 # write out the transformed data
 with io.StringIO() as csv_buff:
