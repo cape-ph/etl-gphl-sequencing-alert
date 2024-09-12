@@ -3,6 +3,7 @@
 import io
 import sys
 from datetime import datetime
+from pathlib import Path
 
 import boto3 as boto3
 from awsglue.context import GlueContext
@@ -42,7 +43,7 @@ clean_bucket_name = parameters["CLEAN_BUCKET_NAME"]
 # NOTE: for now we'll take the alert object key and change out the file
 #       extension for the clean data (leaving all namespacing and such). this
 #       will probably need to change
-clean_obj_key = alert_obj_key.replace(".pdf", ".csv")
+clean_obj_key = str(Path(alert_obj_key).with_suffix(".csv"))
 
 # NOTE: May need some creds here
 s3_client = boto3.client("s3")
@@ -79,13 +80,13 @@ try:
     reader = PdfReader(f)
     page = reader.pages[0]
     date_reported = page.extract_text().split("\n")[3].strip()
-    datetime.strptime(date_reported,'%m/%d/%Y')
+    datetime.strptime(date_reported, "%m/%d/%Y")
 except ValueError as err:
     err_message = (
-            f"ERROR - Could not properly read sequencing report date. "
-            f"ETL will continue."
-            f"{err}"
-        )
+        f"ERROR - Could not properly read sequencing report date. "
+        f"ETL will continue."
+        f"{err}"
+    )
 
     logger.error(err_message)
 
@@ -94,14 +95,14 @@ except ValueError as err:
 try:
     # get two tables from the pdf
     tables = read_pdf(f, multiple_tables=True, pages=2)
-    mlst_st = tables[0]
-    genes = tables[1]
+    mlst_st = tables[0]  # pyright: ignore
+    genes = tables[1]  # pyright: ignore
 except (IndexError, KeyError) as err:
     err_message = (
-            f"ERROR - Could not properly read sequencing PDF tables. "
-            f"ETL Cannot continue."
-            f"{err}"
-        )
+        f"ERROR - Could not properly read sequencing PDF tables. "
+        f"ETL Cannot continue."
+        f"{err}"
+    )
 
     logger.error(err_message)
 
